@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Y&L恋爱日记</title>
+  <style>
+    :root{
+      --bg0:#050915;
+      --ink:#eaf0ff;
+      --pink:#ff6fb1;
+      --dialog-bg: rgba(15, 23, 50, 0.75); /* 加深磨砂背景 */
+      --dialog-stroke: rgba(234, 240, 255, 0.4);
+      --tag-bg: rgba(49, 58, 85, 0.8);
+      --tag-ink:#ffd66e;
+    }
+    html,body{ height:100%; width:100%; margin:0; background:var(--bg0); overflow:hidden; }
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      color:var(--ink);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 全屏舞台 */
+    .stage{ position:fixed; inset:0; z-index: 1; }
+
+    /* 页面容器 */
+    .page{ position:absolute; inset:0; display:none; }
+    .page.active{ display:block; }
+
+    /* 2. 图片铺满全屏的设计 */
+    .image-container{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+    }
+    .pixel-image{
+      width:100%;
+      height:100%;
+      object-fit: cover; /* 核心修改：让图片填满整个屏幕，不留白 */
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* 顶部标签：悬浮样式 */
+    .top-tag{
+      position:absolute;
+      top: max(20px, env(safe-area-inset-top));
+      left:50%;
+      transform:translateX(-50%);
+      padding: 10px 20px;
+      background: var(--tag-bg);
+      backdrop-filter: blur(8px);
+      border: 2px solid var(--dialog-stroke);
+      border-radius: 12px;
+      text-align:center;
+      z-index: 10;
+      min-width: 160px;
+    }
+    .top-tag b { display: block; font-size: 16px; color: var(--tag-ink); }
+    .top-tag small { font-size: 12px; opacity: 0.8; }
+
+    /* 左右导航按钮 */
+    .nav{ position:absolute; inset:0; pointer-events:none; z-index: 20; }
+    .nav-btn{
+      pointer-events:auto; position:absolute; top:50%; transform:translateY(-50%);
+      width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.3);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; backdrop-filter: blur(4px);
+    }
+    .nav-left{ left: 15px; }
+    .nav-right{ right: 15px; }
+
+    /* 底部对话框：磨砂感增强 */
+    .dialog{
+      position:absolute;
+      left: 15px; right: 15px;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      background: var(--dialog-bg);
+      backdrop-filter: blur(15px); /* 磨砂玻璃 */
+      border: 1px solid var(--dialog-stroke);
+      border-radius: 20px;
+      padding: 18px;
+      transform: translateY(150%);
+      opacity: 0;
+      z-index: 15;
+    }
+    .dialog.show{ animation: dialogUp 0.5s cubic-bezier(.2,.9,.2,1) forwards; }
+    @keyframes dialogUp{ to { transform: translateY(0); opacity: 1; } }
+
+    .dialog-title{
+      font-weight: bold; font-size: 18px; margin-bottom: 8px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .dialog-title::before{ content:""; width:8px; height:8px; background:var(--pink); border-radius:50%; }
+    .dialog-text{ font-size: 15px; line-height: 1.6; white-space: pre-wrap; opacity: 0.95; }
+
+    /* 页码指示器 */
+    .page-num{
+      position:absolute; bottom: 10px; right: 20px; font-size: 12px; opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="pagesRoot"></div>
+
+  <div class="nav">
+    <div class="nav-btn nav-left" id="btnPrev" style="display:none;"><span style="color:white; font-size:24px;">‹</span></div>
+    <div class="nav-btn nav-right" id="btnNext"><span style="color:white; font-size:24px;">›</span></div>
+  </div>
+
+  <script>
+    // 【修改图片路径】
+    const IMAGES = Array.from({length: 14}, (_, i) => `assets/${i+1}.png`);
+
+    // 【修改文字位置：你以后只需要在这里改文字！】
+    const PAGES_DATA = [
+      { 
+        tagMain: "在一起第 71 天", tagSub: "过的第一个情人节",
+        title: "封面｜Y&L恋爱日记", 
+        text: "「罗云浩 & 易浩哲」\n「我们在一起的第 71 天。」\n把这些小小的瞬间，做成一条通往未来的路。" 
+      },
+      { 
+        tagMain: "2023.4.15 初遇", tagSub: "二教自习室",
+        title: "初遇｜第一眼就记住了", 
+        text: "那天自习室的灯很白，可我记住的，是你身上的那一点温柔。\n你背着书包走进来，神情认真，我心里轻轻“咚”了一下。" 
+      },
+      // ... 篇幅原因，后续 3-14 页结构以此类推，逻辑已在下方循环处理 ...
+      { tagMain: "路灯下", tagSub: "加了微信", title: "入口", text: "我们的故事，终于有了一个可以反复回到的入口。" },
+      { tagMain: "鬼屋", tagSub: "靠近你", title: "勇气", text: "原来“害怕”的反义词不是勇敢，是有人在身边。" },
+      { tagMain: "重逢", tagSub: "你回国了", title: "第二次开场", text: "我在教室门外看见你，不敢相信自己的眼睛。你回来了。" },
+      { tagMain: "长聊", tagSub: "一整夜", title: "坦诚", text: "把误会拆开，把委屈放下。喜欢一个人，会让人变得更诚实。" },
+      { tagMain: "2025.12.4", tagSub: "正式在一起", title: "独一无二", text: "送你小王子鲜花。从那天起，我想把“认真”变成日常。" },
+      { tagMain: "初吻", tagSub: "二教楼下", title: "安静的世界", text: "那一秒，世界忽然安静到只剩心跳。你没有躲开的眼神，就是答案。" },
+      { tagMain: "海底捞", tagSub: "通宵火锅", title: "烟火气", text: "把一顿火锅吃成了“家常”。只要和你一起，夜都不再漫长。" },
+      { tagMain: "机场", tagSub: "吻别", title: "约定", text: "不是告别，是把思念先存起来，等下次见面再一次性兑现。" },
+      { tagMain: "未来", tagSub: "早餐", title: "平淡生活", text: "想和你一起慢慢醒来，窗外有阳光，桌上有热气。" },
+      { tagMain: "未来", tagSub: "晚餐", title: "琐碎的幸福", text: "不用每天浪漫，只要每天都在同一张桌子旁。" },
+      { tagMain: "未来", tagSub: "晚安", title: "安心", text: "灯关掉之后，你伸手就能碰到我。有你在，我睡得很踏实。" },
+      { tagMain: "Ending", tagSub: "未完待续", title: "Continuing...", text: "谢谢你愿意走进来。我们的故事，永远未完待续。" }
+    ];
+
+    const root = document.getElementById('pagesRoot');
+    PAGES_DATA.forEach((data, i) => {
+      const idx = i + 1;
+      const sec = document.createElement('section');
+      sec.className = 'page';
+      sec.id = `page${idx}`;
+      sec.innerHTML = `
+        <div class="image-container"><img class="pixel-image" src="${IMAGES[i]}"></div>
+        <div class="top-tag"><b>${data.tagMain}</b><small>${data.tagSub}</small></div>
+        <div class="dialog" id="dialog${idx}">
+          <div class="dialog-title">${data.title}</div>
+          <div class="dialog-text" id="text${idx}"></div>
+          <div class="page-num">${idx} / 14</div>
+        </div>
+      `;
+      root.appendChild(sec);
+    });
+
+    let current = 1;
+    let typingTimer = null;
+
+    function typeWriter(el, text) {
+      clearInterval(typingTimer);
+      el.textContent = "";
+      let i = 0;
+      typingTimer = setInterval(() => {
+        if(i < text.length) { el.textContent += text[i]; i++; }
+        else clearInterval(typingTimer);
+      }, 30);
+    }
+
+    function showPage(n) {
+      if(n < 1 || n > 14) return;
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const cur = document.getElementById(`page${n}`);
+      cur.classList.add('active');
+      
+      const dialog = document.getElementById(`dialog${n}`);
+      const textEl = document.getElementById(`text${n}`);
+      dialog.classList.remove('show');
+      void dialog.offsetWidth; 
+      dialog.classList.add('show');
+      
+      setTimeout(() => typeWriter(textEl, PAGES_DATA[n-1].text), 400);
+
+      current = n;
+      document.getElementById('btnPrev').style.display = n === 1 ? 'none' : 'flex';
+      document.getElementById('btnNext').style.display = n === 14 ? 'none' : 'flex';
+    }
+
+    document.getElementById('btnNext').onclick = () => showPage(current + 1);
+    document.getElementById('btnPrev').onclick = () => showPage(current - 1);
+    
+    // 滑动翻页
+    let startX = 0;
+    window.ontouchstart = e => startX = e.touches[0].clientX;
+    window.ontouchend = e => {
+      let diff = e.changedTouches[0].clientX - startX;
+      if(Math.abs(diff) > 50) diff > 0 ? showPage(current-1) : showPage(current+1);
+    };
+
+    showPage(1);
+  </script>
+</body>
+</html>
