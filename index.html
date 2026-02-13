@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Y&L恋爱日记</title>
+  <style>
+    :root{
+      /* ===== 核心配色 ===== */
+      --bg0:#050915;
+      --bg1:#0b1630;
+      --panel:#0f1732cc;
+      --stroke:#2b3768;
+      --stroke2:#16214a;
+      --ink:#eaf0ff;
+      --muted:#b9c6ff;
+      --pink:#ff6fb1;
+      --blue:#5dbbff;
+
+      /* 对话框 */
+      --dialog-bg:#1a223bcc;
+      --dialog-stroke:#eaf0ff;
+      --dialog-title:#eaf0ff;
+      --dialog-text:#eaf0ff;
+
+      /* 顶部日期牌 */
+      --tag-bg:#313a55;
+      --tag-stroke:#eaf0ff;
+      --tag-ink:#ffd66e;
+
+      /* 按钮 */
+      --btn-bg:#141c33cc;
+      --btn-stroke:#eaf0ff;
+      --btn-ink:#eaf0ff;
+      --btn-left:#b7b3ff;
+      --btn-right:#ffb6d9;
+    }
+
+    html,body{height:100%;width:100%;margin:0;background:var(--bg0);overflow:hidden;}
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC","Microsoft YaHei", sans-serif;
+      color:var(--ink);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ===== 全屏舞台 ===== */
+    .stage{
+      position:fixed;
+      inset:0;
+      background:
+        radial-gradient(1200px 800px at 30% 20%, rgba(93,187,255,.10), transparent 55%),
+        radial-gradient(900px 700px at 70% 35%, rgba(255,111,177,.10), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+    }
+
+    /* ===== 云朵像素风“点阵雾”叠加 ===== */
+    .clouds{
+      position:absolute; inset:0;
+      pointer-events:none;
+      opacity:.55;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255,255,255,.10) 0 35px, transparent 36px),
+        radial-gradient(circle at 30% 18%, rgba(255,255,255,.08) 0 44px, transparent 45px),
+        radial-gradient(circle at 55% 22%, rgba(255,255,255,.09) 0 52px, transparent 53px),
+        radial-gradient(circle at 78% 16%, rgba(255,255,255,.08) 0 46px, transparent 47px),
+        radial-gradient(circle at 20% 55%, rgba(255,255,255,.06) 0 55px, transparent 56px),
+        radial-gradient(circle at 65% 60%, rgba(255,255,255,.05) 0 65px, transparent 66px);
+      filter: blur(.2px);
+      z-index: 2;
+    }
+    .clouds::after{
+      content:"";
+      position:absolute; inset:0;
+      background-image:
+        radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: 6px 6px;
+      opacity:.9;
+      mix-blend-mode: screen;
+    }
+
+    /* ===== 页面容器 ===== */
+    .page{
+      position:absolute; inset:0;
+      display:none;
+      z-index: 1;
+    }
+    .page.active{display:block;}
+
+    /* 图片全屏铺满 */
+    .image-container{
+      position:absolute; inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .pixel-image{
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* 核心：铺满全屏 */
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* ===== 顶部“日期牌” ===== */
+    .top-tag{
+      position:absolute;
+      top: max(20px, env(safe-area-inset-top));
+      left:50%;
+      transform:translateX(-50%);
+      padding: 10px 14px;
+      background: var(--tag-bg);
+      border: 3px solid var(--tag-stroke);
+      border-radius: 10px;
+      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+      font-weight: 800;
+      letter-spacing: .5px;
+      color: var(--tag-ink);
+      text-align:center;
+      min-width: 180px;
+      z-index: 10;
+    }
+    .top-tag small{
+      display:block;
+      font-weight: 700;
+      color: rgba(255,214,110,.95);
+      margin-top: 2px;
+      letter-spacing: 0;
+      font-size: 0.9em;
+    }
+
+    /* ===== 左右翻页按钮 ===== */
+    .nav{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index: 20;
+    }
+    .nav-btn{
+      pointer-events:auto;
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      background: var(--btn-bg);
+      border: 3px solid var(--btn-stroke);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      cursor:pointer;
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .nav-btn:active{ transform:translateY(-50%) scale(.97); }
+    .nav-left{ left: 14px; background: color-mix(in oklab, var(--btn-bg) 75%, var(--btn-left) 25%); }
+    .nav-right{ right: 14px; background: color-mix(in oklab, var(--btn-bg) 75%, var(--btn-right) 25%); }
+    .nav-btn span{
+      font-size: 26px;
+      line-height: 1;
+      color: var(--btn-ink);
+      text-shadow: 0 2px 0 rgba(0,0,0,.35);
+    }
+
+    /* ===== 底部对话框 ===== */
+    .dialog{
+      position:absolute;
+      left: 12px;
+      right: 12px;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      background: var(--dialog-bg);
+      border: 3px solid var(--dialog-stroke);
+      border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.42);
+      overflow:hidden;
+      transform: translateY(130%);
+      opacity: 0;
+      z-index: 15;
+      backdrop-filter: blur(4px);
+    }
+    .dialog.show{
+      animation: dialogUp .38s cubic-bezier(.2,.9,.2,1) forwards;
+    }
+    @keyframes dialogUp{
+      from{ transform: translateY(130%); opacity: 0; }
+      to  { transform: translateY(0%);   opacity: 1; }
+    }
+
+    .dialog-inner{ padding: 14px 14px 16px; }
+    .dialog-title{
+      font-weight: 900;
+      font-size: 18px;
+      color: var(--dialog-title);
+      margin-bottom: 10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .dialog-title .dot{
+      width: 10px; height: 10px; border-radius: 999px;
+      background: var(--pink);
+      box-shadow: 0 0 0 3px rgba(255,111,177,.18);
+      flex: 0 0 auto;
+    }
+    .dialog-text{
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--dialog-text);
+      white-space: pre-wrap;
+      min-height: 3.2em;
+    }
+
+    /* HUD */
+    .hud{
+      position:absolute;
+      left: 12px;
+      right: 12px;
+      bottom: calc(max(20px, env(safe-area-inset-bottom)) + 150px);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      pointer-events:none;
+      z-index: 10;
+    }
+    .pill{
+      pointer-events:auto;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid rgba(234,240,255,.22);
+      box-shadow: 0 10px 22px rgba(0,0,0,.25);
+      font-size: 12px;
+      color: var(--muted);
+      user-select:none;
+    }
+    .pill button{
+      all: unset;
+      cursor:pointer;
+      font-weight: 800;
+      color: var(--ink);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <div class="clouds"></div>
+
+    <div id="pagesRoot"></div>
+
+    <div class="nav">
+      <div class="nav-btn nav-left" id="btnPrev" aria-label="上一页"><span>←</span></div>
+      <div class="nav-btn nav-right" id="btnNext" aria-label="下一页"><span>→</span></div>
+    </div>
+
+    <div class="hud">
+      <div class="pill"><button id="btnReplay">重播本页动画</button></div>
+      <div class="pill" id="pageIndicator">1 / 14</div>
+    </div>
+  </div>
+
+  <script>
+    // 1. 图片路径配置 (assets/1.png ... assets/14.png)
+    const IMAGES = Array.from({length: 14}, (_, i) => `assets/${i+1}.png`);
+
+    // 2. 顶部日期/地点标签数据
+    const TOP_TAGS = [
+      { main: "在一起第 71 天", sub: "过的第一个情人节" },
+      { main: "2025年3月 初遇", sub: "二教自习室" },
+      { main: "2025.6.20 路灯下", sub: "加了微信" },
+      { main: "2025.6.22 鬼屋", sub: "一起去鬼屋" },
+      { main: "2025.11.25 回国", sub: "再次相遇" },
+      { main: "2025.11.27 路灯下", sub: "聊了一整夜" },
+      { main: "2025.12.4", sub: "小王子鲜花" },
+      { main: "2025.12.6 二教楼下", sub: "初吻" },
+      { main: "2025.12.7 海底捞", sub: "通宵火锅" },
+      { main: "2025.12.7 机场", sub: "吻别" },
+      { main: "未来", sub: "一起吃早餐" },
+      { main: "未来", sub: "三餐四季" },
+      { main: "未来", sub: "一起睡觉" },
+      { main: "我们的故事", sub: "continuing…" },
+    ];
+
+    // 3. 底部对话框文字数据
+    const PAGES_DATA = [
+      { title: "在一起第 71 天", text: "「罗云浩 & 易浩哲」\n「我们在一起的第 71 天。」\n「把这些小小的瞬间，做成一条通往未来的路。」\n这也是我们一起过的第一个情人节。\n从那天起，我开始把“我”的生活，\n一点点写成“我们”。" },
+      { title: "二教自习室初遇｜第一眼就记住了", text: "那天自习室的灯很白，\n可我记住的，是你身上的那一点温柔。\n我依旧记得第一次见你的样子：\n你背着书包，抱着电脑走进来，\n神情认真又有点稚气。\n原来“遇见”不是轰轰烈烈，\n是心里轻轻“咚”了一下。" },
+      { title: "路灯下加微信｜我们的故事有了入口", text: "夜色把城市调成了柔软的蓝，\n路灯把影子拉得很长。\n我鼓起勇气走近一点点，\n假装很自然、又紧张得要命。\n我们的故事，终于有了一个可以反复回到的入口。" },
+      { title: "一起玩鬼屋｜害怕也想靠近你", text: "鬼屋里黑得像把心跳放大了十倍，\n我一边嘴硬，一边把手心攥得发烫。\n你走在我旁边，\n让我觉得——\n原来“害怕”的反义词不是勇敢，\n是有人在身边。" },
+      { title: "他回国｜自习室再次相遇", text: "你回国那天\n我在教室门外看见你，\n不敢相信自己的眼睛，\n来来回回看了你好几次，\n像在确认：这是真的，你回来了。\n那是我们故事的第二次开场。" },
+      { title: "路灯下畅聊一整夜｜误会被温柔拆开", text: "那一晚路灯很亮，\n亮到我终于敢把心里没说完的话都说出来。\n我们把误会一层层拆开。\n从午夜聊到天亮，\n原来喜欢一个人，真的会让人变得更诚实。" },
+      { title: "小王子鲜花｜从一束花开始更认真", text: "12.4，我们在一起了。\n我把一束“小王子”花送给你，\n世界上有五千朵和你一样的花，\n可只有你——是我独一无二的那一朵。\n" },
+      { title: "二教楼下初吻｜那一秒世界变安静", text: "二教楼下的风很轻，\n我却像用了全身的勇气。\n夺走了你的初吻，很青涩，也很笨拙，\n但那一秒，世界忽然安静到只剩心跳。\n你看着我是最美的回应。" },
+      { title: "海底捞通宵火锅｜把夜晚吃成家常", text: "我们在海底捞吃到深夜，\n把一顿火锅吃成了“家常”。\n沸腾的汤底、热气和笑声，把冬天都煮得很暖。\n以后再长的夜，只要和你一起，\n都会变得好过。" },
+      { title: "机场吻别｜把思念先存起来", text: "机场的广播一遍遍响起，\n人群来来往往，我们却像被按下了慢放。\n那个吻像是一次约定：\n不是告别，是把思念先存起来，\n等我们下次见面，再一次性兑现。" },
+      { title: "未来｜一起吃早餐", text: "以后想和你一起吃早餐。\n不是赶时间的那种，是慢慢醒来、慢慢说话。\n窗外有阳光，桌上有热气。\n你喝第一口咖啡的时候，我想看着你笑一下，\n然后把今天也当成礼物。" },
+      { title: "未来｜一起吃饭", text: "以后想和你一起吃饭，\n把“吃什么”变成最幸福的小事。\n我想在你对面，听你讲一天里最琐碎的细节。\n我们不用每天浪漫，\n只要每天都在同一张桌子旁。" },
+      { title: "未来｜一起睡觉", text: "以后想和你一起睡觉，是安心的那种。\n灯关掉之后，你伸手就能碰到我，\n我翻个身就能靠近你。\n我想把“晚安”说得很轻，\n因为你在，我就会睡得很踏实。" },
+      { title: "故事 continuing…", text: "我们的故事越写越长了。\n这些瞬间像一颗颗小小的像素，\n拼成了我们自己的宇宙。\n谢谢你愿意走进来，也谢谢你一直没有离开。\n我们的故事，continuing…" }
+    ];
+
+    // 初始化：生成 HTML 结构
+    const pagesRoot = document.getElementById('pagesRoot');
+    const total = 14;
+
+    PAGES_DATA.forEach((_, i) => {
+      const idx = i + 1;
+      const section = document.createElement('section');
+      section.className = 'page';
+      section.id = `page${idx}`;
+      section.innerHTML = `
+        <div class="image-container">
+          <img class="pixel-image" id="img${idx}" src="${IMAGES[i]}" alt="page${idx}">
+        </div>
+        <div class="top-tag" id="tag${idx}"></div>
+        <div class="dialog" id="dialog${idx}">
+          <div class="dialog-inner">
+            <div class="dialog-title">
+              <span class="dot"></span>
+              <span id="title${idx}"></span>
+            </div>
+            <div class="dialog-text" id="text${idx}"></div>
+          </div>
+        </div>
+      `;
+      pagesRoot.appendChild(section);
+    });
+
+    // 逻辑控制
+    let current = 1;
+    let typingTimer = null;
+
+    const pageIndicator = document.getElementById("pageIndicator");
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+    const btnReplay = document.getElementById("btnReplay");
+
+    // 打字机效果
+    function typeWriter(el, text, speed=22){
+      clearInterval(typingTimer);
+      el.textContent = "";
+      let idx = 0;
+      typingTimer = setInterval(()=>{
+        el.textContent += text[idx] ?? "";
+        idx++;
+        if(idx >= text.length) clearInterval(typingTimer);
+      }, speed);
+    }
+
+    // 播放页面动画
+    function startPageAnimation(n){
+      clearInterval(typingTimer);
+      const dialog = document.getElementById(`dialog${n}`);
+      const textEl = document.getElementById(`text${n}`);
+
+      // 重置状态
+      dialog.classList.remove("show");
+      void dialog.offsetWidth; // 强制重排
+      textEl.textContent = "";
+
+      // 延迟弹出并打字
+      setTimeout(()=>{
+        dialog.classList.add("show");
+        setTimeout(()=> typeWriter(textEl, PAGES_DATA[n-1].text, 18), 220);
+      }, 120);
+    }
+
+    // 切换页面核心函数
+    function showPage(n){
+      n = Math.max(1, Math.min(total, n));
+
+      // 切换 DOM 显示
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const curPage = document.getElementById(`page${n}`);
+      curPage.classList.add('active');
+      current = n;
+
+      // 更新 HUD
+      pageIndicator.textContent = `${current} / ${total}`;
+
+      // 更新当前页的标签和标题
+      const tag = TOP_TAGS[n-1];
+      document.getElementById(`tag${n}`).innerHTML = `${tag.main}<small>${tag.sub}</small>`;
+      document.getElementById(`title${n}`).textContent = PAGES_DATA[n-1].title;
+
+      // 执行动画
+      startPageAnimation(n);
+
+      // 控制按钮显隐
+      btnPrev.style.display = (current===1) ? "none" : "flex";
+      btnNext.style.display = (current===total) ? "none" : "flex";
+    }
+
+    // 事件绑定
+    function nextPage(){ showPage(current + 1); }
+    function prevPage(){ showPage(current - 1); }
+    function replayPage(){ startPageAnimation(current); }
+
+    btnNext.addEventListener("click", nextPage);
+    btnPrev.addEventListener("click", prevPage);
+    btnReplay.addEventListener("click", replayPage);
+
+    // 触摸滑动支持
+    let startX = null;
+    window.addEventListener("touchstart", (e)=>{
+      startX = e.touches?.[0]?.clientX ?? null;
+    }, {passive:true});
+    window.addEventListener("touchend", (e)=>{
+      if(startX===null) return;
+      const endX = e.changedTouches?.[0]?.clientX ?? startX;
+      const dx = endX - startX;
+      startX = null;
+      if(Math.abs(dx) < 45) return; // 滑动距离太短不触发
+      if(dx < 0) nextPage();
+      else prevPage();
+    }, {passive:true});
+
+    // 键盘支持
+    window.addEventListener("keydown",(e)=>{
+      if(e.key==="ArrowRight") nextPage();
+      if(e.key==="ArrowLeft") prevPage();
+      if(e.key==="r" || e.key==="R") replayPage();
+    });
+
+    // 启动
+    showPage(1);
+  </script>
+</body>
+</html>
